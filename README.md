@@ -6,15 +6,14 @@
   <img src="img/title.webp" alt="マジックジュエル タイトル" width="360" />
 </p>
 
-## 代表的な画面
+## 代表的なキャラクター
 
 <p align="center">
   <img src="img/2.webp" alt="ゲーム画面の一例" width="320" />
 </p>
 
-## プレイ中のスクリーンショット
+## プレイ画面
 
-（リポジトリの `doc/game.webp` を更新すると、この見出し直下の画像が説明用の「実画面」として使えます。）
 
 <p align="center">
   <img src="doc/game.webp" alt="プレイ画面のスクリーンショット" width="520" />
