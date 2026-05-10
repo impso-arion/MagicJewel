@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>マジックジュエル</title>
+  <!-- プロトタイプ用 CDN（コンソールに本番非推奨の警告が出ます）。Node 導入後は npm run build:css で styles.css を生成し、下の script を link に差し替え可能。 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['"Shippori Mincho"', 'serif'],
+          },
+          colors: {
+            jewel: {
+              ruby: '#e11d48',
+              sapphire: '#2563eb',
+              emerald: '#059669',
+              topaz: '#d97706',
+            },
+          },
+        },
+      },
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;800&display=swap" rel="stylesheet" />
+  <style>
+    .tube-glass {
+      background: linear-gradient(90deg, rgba(255,255,255,0.12), rgba(255,255,255,0.02) 40%, rgba(255,255,255,0.08));
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.25), 0 8px 24px rgba(15, 23, 42, 0.35);
+    }
+    .jewel-shine::after {
+      content: '';
+      position: absolute;
+      inset: 18% 22% auto 22%;
+      height: 28%;
+      border-radius: 9999px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0));
+      pointer-events: none;
+    }
+    @keyframes float-soft {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    .animate-float-soft {
+      animation: float-soft 3s ease-in-out infinite;
+    }
+    @keyframes hand-invalid {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+    .hand-invalid-shake {
+      animation: hand-invalid 0.28s ease-out;
+    }
+    @keyframes timer-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.65; }
+    }
+    .timer-urgent {
+      animation: timer-pulse 0.9s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="min-h-dvh bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-900 text-slate-100 font-sans selection:bg-violet-500/40">
+  <!-- タイトル（縦長スマホ想定・画像上に難易度） -->
+  <div
+    id="screen-title"
+    class="fixed inset-0 z-30 flex flex-col bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-900 px-4 pb-6 pt-[max(1rem,env(safe-area-inset-top))]"
+  >
+    <div class="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-5">
+      <div class="flex w-full flex-1 flex-col items-center justify-end gap-3 pb-2">
+        <p class="font-display text-center text-lg tracking-[0.25em] text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-200 via-amber-100 to-cyan-200 sm:text-xl">
+          マジックジュエル
+        </p>
+        <img
+          id="title-art"
+          src="img/title.webp"
+          alt=""
+          class="mx-auto w-full max-w-sm object-contain object-bottom max-h-[58dvh] sm:max-h-[52dvh]"
+          width="720"
+          height="1280"
+        />
+      </div>
+      <div class="flex w-full max-w-sm shrink-0 flex-col gap-2">
+        <p class="text-center text-[11px] text-slate-500">難易度（制限時間はゆるめに設定）</p>
+        <button
+          type="button"
+          data-difficulty="short"
+          class="rounded-xl border border-emerald-500/40 bg-emerald-950/40 py-3 text-sm font-medium text-emerald-100 transition hover:bg-emerald-900/50 active:scale-[0.99]"
+        >
+          かんたん（short）・4色・各バー4個まで
+        </button>
+        <button
+          type="button"
+          data-difficulty="middle"
+          class="rounded-xl border border-amber-500/40 bg-amber-950/40 py-3 text-sm font-medium text-amber-100 transition hover:bg-amber-900/50 active:scale-[0.99]"
+        >
+          ふつう（middle）・5色・各バー8個まで
+        </button>
+        <button
+          type="button"
+          data-difficulty="long"
+          class="rounded-xl border border-rose-500/40 bg-rose-950/40 py-3 text-sm font-medium text-rose-100 transition hover:bg-rose-900/50 active:scale-[0.99]"
+        >
+          ながい（long）・6色・各バー12個まで
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ゲーム本体 -->
+  <div id="screen-game" class="mx-auto hidden flex min-h-dvh max-w-4xl flex-col px-3 py-4 sm:px-6 sm:py-8">
+    <header class="mb-3 text-center sm:mb-4">
+      <h1 class="font-display text-xl tracking-[0.15em] text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-200 via-amber-100 to-cyan-200 sm:text-2xl">
+        マジックジュエル
+      </h1>
+      <p id="difficulty-label" class="mt-1 text-xs text-slate-500"></p>
+      <div
+        id="timer-wrap"
+        class="mx-auto mt-3 flex max-w-md flex-col items-center gap-1 rounded-xl border border-white/10 bg-slate-900/60 px-4 py-2"
+      >
+        <p class="text-[10px] uppercase tracking-widest text-slate-500">残り時間</p>
+        <p id="timer-display" class="font-mono text-2xl font-semibold tabular-nums text-amber-100 sm:text-3xl">
+          —:—
+        </p>
+        <div class="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+          <div id="timer-bar" class="h-full w-full origin-left rounded-full bg-gradient-to-r from-emerald-500 to-amber-400 transition-[width] duration-1000 ease-linear"></div>
+        </div>
+      </div>
+      <p class="mt-2 hidden text-xs text-slate-400 sm:block">
+        上端だけ操作。同色はまとめて POP、余白があれば PUSH。別バーは Pull 優先。
+      </p>
+    </header>
+
+    <section
+      id="hand"
+      class="mb-3 flex min-h-[4.5rem] flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-3 py-2 backdrop-blur sm:min-h-[5.5rem]"
+      aria-live="polite"
+    >
+      <p class="mb-1 text-[10px] uppercase tracking-widest text-slate-500 sm:text-xs">手元 LIFO</p>
+      <div id="hand-stack" class="flex flex-row-reverse items-center gap-1.5 sm:gap-2"></div>
+      <p id="hand-hint" class="mt-1 text-center text-[11px] text-slate-500 sm:text-sm">バーをタップして取り出す</p>
+    </section>
+
+    <div class="flex flex-1 flex-col justify-center">
+      <div
+        id="tubes"
+        class="flex flex-wrap items-end justify-center gap-2 sm:gap-4"
+        role="application"
+        aria-label="ジュエルバー"
+      ></div>
+    </div>
+
+    <footer class="mt-4 flex flex-wrap items-center justify-center gap-2 sm:mt-6">
+      <button
+        id="btn-reset"
+        type="button"
+        class="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm text-slate-200 transition hover:bg-white/20 active:scale-[0.98]"
+      >
+        タイトルに戻る
+      </button>
+      <span id="moves" class="text-xs text-slate-500 sm:text-sm"></span>
+    </footer>
+  </div>
+
+  <!-- クリアオーバーレイ（閉じているときは inert で子のクリックも無効。子に pointer-events-auto を付けないこと） -->
+  <div
+    id="overlay-win"
+    inert
+    class="pointer-events-none fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/80 p-4 opacity-0 backdrop-blur-md transition-opacity duration-500"
+    aria-hidden="true"
+  >
+    <div class="max-w-lg text-center">
+      <p class="font-display mb-2 text-xl text-amber-100 sm:text-3xl">クリア！</p>
+      <p class="mb-6 text-sm text-slate-300">祝福の魔女がひとり現れました。</p>
+      <div id="witch-gallery" class="flex justify-center"></div>
+      <button
+        id="btn-play-again"
+        type="button"
+        disabled
+        class="mt-8 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-fuchsia-500/30 transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        タイトルに戻る
+      </button>
+      <p class="mt-3 max-w-xs text-center text-[11px] leading-relaxed text-slate-500 sm:text-xs">
+        タイトルから同じ難易度でもう一度遊べます。
+      </p>
+    </div>
+  </div>
+
+  <!-- タイムアップ -->
+  <div
+    id="overlay-lose"
+    inert
+    class="pointer-events-none fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/90 p-4 opacity-0 backdrop-blur-md transition-opacity duration-500"
+    aria-hidden="true"
+  >
+    <div class="max-w-lg px-2 text-center">
+      <p class="font-display text-xl text-rose-200 sm:text-3xl">タイムアップ</p>
+      <img
+        id="gameover-art"
+        src="img/gameOver.webp"
+        alt=""
+        width="640"
+        height="400"
+        class="mx-auto mt-4 max-h-[38vh] w-full max-w-md object-contain"
+      />
+      <p id="gameover-detail" class="mt-4 text-sm text-slate-400"></p>
+      <div class="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+        <button
+          id="btn-retry-timeup"
+          type="button"
+          disabled
+          class="rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-8 py-3 text-sm font-semibold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          リトライ
+        </button>
+        <button
+          id="btn-to-title"
+          type="button"
+          disabled
+          class="rounded-full border border-white/25 bg-white/10 px-8 py-3 text-sm font-medium text-slate-100 transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          タイトルへ
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /** @typedef {'ruby'|'sapphire'|'emerald'|'topaz'|'amethyst'|'moonstone'} JewelId */
+
+    const JEWEL_META = {
+      ruby: { label: 'ルビー', class: 'bg-[#e11d48]' },
+      sapphire: { label: 'サファイア', class: 'bg-[#2563eb]' },
+      emerald: { label: 'エメラルド', class: 'bg-[#059669]' },
+      topaz: { label: 'トパーズ', class: 'bg-[#d97706]' },
+      amethyst: { label: 'アメジスト', class: 'bg-[#7c3aed]' },
+      moonstone: { label: 'ムーンストーン', class: 'bg-[#94a3b8]' },
+    };
+
+    const LOG_TAG = '[マジックジュエル]';
+    /** true にするとコンソールへ詳細ログ */
+    const MJ_DEBUG = false;
+
+    function glog(action, detail) {
+      if (!MJ_DEBUG) return;
+      const d = detail && typeof detail === 'object' ? { ...detail } : detail;
+      if (d && d.state) d.state = '(snapshot)';
+      if (d && d.stateBefore) d.stateBefore = '(snapshot)';
+      if (d && d.stateAfter) d.stateAfter = '(snapshot)';
+      console.log(LOG_TAG, action, d ?? '');
+    }
+
+    /**
+     * 底→上の初期配置。対角パターンで各色が均等に出る（middle/long）。
+     * @param {number} numFilledTubes ジュール入りの本数
+     * @param {number} capacity 1本あたりの最大個数
+     * @param {string[]} colors 色の配列（本数と同じ長さが望ましい）
+     * @param {number} emptyTubes 空バーの本数
+     */
+    function buildDiagonalInitial(numFilledTubes, capacity, colors, emptyTubes = 2) {
+      const tubes = [];
+      for (let t = 0; t < numFilledTubes; t++) {
+        const col = [];
+        const n = colors.length;
+        for (let r = 0; r < capacity; r++) col.push(colors[(r + t) % n]);
+        tubes.push(col);
+      }
+      for (let e = 0; e < emptyTubes; e++) tubes.push([]);
+      return tubes;
+    }
+
+    /** 底→上。short=手置きの解ける4色6本（容量4）、middle/long は上記ビルダ */
+    const LEVEL_INITIAL = {
+      short: [
+        ['ruby', 'topaz', 'emerald', 'sapphire'],
+        ['sapphire', 'emerald', 'ruby', 'topaz'],
+        ['topaz', 'sapphire', 'emerald', 'ruby'],
+        ['emerald', 'ruby', 'sapphire', 'topaz'],
+        [],
+        [],
+      ],
+      middle: buildDiagonalInitial(5, 8, ['ruby', 'sapphire', 'emerald', 'topaz', 'amethyst'], 2),
+      long: buildDiagonalInitial(6, 12, ['ruby', 'sapphire', 'emerald', 'topaz', 'amethyst', 'moonstone'], 2),
+    };
+
+    /** 1本あたりの最大ジュエル数 */
+    const LEVEL_TUBE_CAPACITY = {
+      short: 4,
+      middle: 8,
+      long: 12,
+    };
+
+    /** ゆるめの制限時間（秒）・切迫感用（バーが長いほど長め） */
+    const LEVEL_TIME_SEC = {
+      short: 240,
+      middle: 520,
+      long: 900,
+    };
+
+    const els = {
+      screenTitle: document.getElementById('screen-title'),
+      screenGame: document.getElementById('screen-game'),
+      hand: document.getElementById('hand'),
+      titleArt: document.getElementById('title-art'),
+      difficultyLabel: document.getElementById('difficulty-label'),
+      timerDisplay: document.getElementById('timer-display'),
+      timerBar: document.getElementById('timer-bar'),
+      timerWrap: document.getElementById('timer-wrap'),
+      tubes: document.getElementById('tubes'),
+      handStack: document.getElementById('hand-stack'),
+      handHint: document.getElementById('hand-hint'),
+      moves: document.getElementById('moves'),
+      overlayWin: document.getElementById('overlay-win'),
+      overlayLose: document.getElementById('overlay-lose'),
+      witchGallery: document.getElementById('witch-gallery'),
+      gameoverDetail: document.getElementById('gameover-detail'),
+      gameOverArt: document.getElementById('gameover-art'),
+      btnReset: document.getElementById('btn-reset'),
+      btnPlayAgain: document.getElementById('btn-play-again'),
+      btnToTitle: document.getElementById('btn-to-title'),
+      btnRetryTimeup: document.getElementById('btn-retry-timeup'),
+    };
+
+    function jewelDot(id, opts = {}) {
+      const { small } = opts;
+      const meta = JEWEL_META[id];
+      const wrap = document.createElement('span');
+      wrap.className =
+        'jewel-shine relative inline-flex rounded-full ' +
+        (small ? 'h-7 w-7 sm:h-8 sm:w-8' : 'h-9 w-9 sm:h-11 sm:w-11') +
+        ' shrink-0 ring-2 ring-white/25 shadow-lg ' +
+        meta.class;
+      wrap.title = meta.label;
+      return wrap;
+    }
+
+    /**
+     * ジュエル列を「底が先頭・上端が末尾」の1本のスタックとして扱う LIFO バッファ。
+     * 触れるのは常に上端（peek / pop / push の対象）。
+     */
+    class JewelBuffer {
+      /**
+       * @param {number} capacity 最大個数
+       * @param {JewelId[]} initialBottomToTop 底から上への初期配列
+       */
+      constructor(capacity, initialBottomToTop = []) {
+        this.capacity = capacity;
+        /** @type {JewelId[]} インデックス0=底、末尾=上端（LIFO の口） */
+        this._stack = [...initialBottomToTop];
+      }
+
+      get length() {
+        return this._stack.length;
+      }
+
+      get room() {
+        return this.capacity - this._stack.length;
+      }
+
+      isEmpty() {
+        return this._stack.length === 0;
+      }
+
+      /** @returns {JewelId | null} 上端1個 */
+      peekTop() {
+        if (this._stack.length === 0) return null;
+        return this._stack[this._stack.length - 1];
+      }
+
+      /** 表示用: 底→上のコピー */
+      toArrayBottomToTop() {
+        return [...this._stack];
+      }
+
+      clear() {
+        this._stack.length = 0;
+      }
+
+      /** 上端から連続する同色の長さ（POP するならまとめてこの個数） */
+      topColorRunLength() {
+        const top = this.peekTop();
+        if (top == null) return 0;
+        let n = 0;
+        for (let i = this._stack.length - 1; i >= 0 && this._stack[i] === top; i--) n++;
+        return n;
+      }
+
+      /**
+       * 上端から同色連続をまとめて POP。返り値は「底→上」で1かたまり（次のバッファへ PUSH するときの順序）。
+       */
+      popTopColorRun() {
+        const top = this.peekTop();
+        if (top == null) return [];
+        const poppedTopFirst = [];
+        while (this.peekTop() === top) poppedTopFirst.push(this._stack.pop());
+        poppedTopFirst.reverse();
+        return poppedTopFirst;
+      }
+
+      /**
+       * 上端から同色を最大 maxCount 個まで POP（底→上で返す）
+       */
+      popTopColorRunAtMost(maxCount) {
+        const top = this.peekTop();
+        if (top == null || maxCount <= 0) return [];
+        const poppedTopFirst = [];
+        let n = 0;
+        while (this.peekTop() === top && n < maxCount) {
+          poppedTopFirst.push(this._stack.pop());
+          n++;
+        }
+        poppedTopFirst.reverse();
+        return poppedTopFirst;
+      }
+
+      /**
+       * 底→上の1かたまりを上に PUSH（chunk[0] がいまの上端のひとつ上に来る）
+       */
+      pushBottomToTop(chunk) {
+        if (!chunk.length) return;
+        if (this.room < chunk.length) return;
+        for (let i = 0; i < chunk.length; i++) this._stack.push(chunk[i]);
+      }
+
+      /**
+       * 手元→バーへ渡すときの可否。chunk は底→上。
+       * 色は問わず、余白（room）が塊の長さ以上なら PUSH 可（物理的に収まるかだけ）。
+       */
+      canAcceptBottomToTopChunk(chunk) {
+        if (!chunk.length) return false;
+        return this.room >= chunk.length;
+      }
+    }
+
+    class MagicJewelGame {
+      /**
+       * @param {JewelId[][]} initialRows 各バー底→上
+       * @param {number} tubeCapacity
+       * @param {string} newInstanceCause ログ用
+       */
+      constructor(initialRows, tubeCapacity, newInstanceCause = 'unknown') {
+        this.tubeCapacity = tubeCapacity;
+        this.tubes = initialRows.map((init) => new JewelBuffer(tubeCapacity, init));
+        this.hand = new JewelBuffer(tubeCapacity);
+        this.primarySourceIndex = null;
+        this.handSpannedMultipleTubes = false;
+        this.moves = 0;
+        glog('newGameInstance', { cause: newInstanceCause });
+      }
+
+      /** ログ用スナップショット（底→上の配列） */
+      snapshot() {
+        return {
+          tubes: this.tubes.map((t, i) => ({
+            i,
+            len: t.length,
+            bottomToTop: t.toArrayBottomToTop(),
+          })),
+          handBottomToTop: this.hand.toArrayBottomToTop(),
+          primarySourceIndex: this.primarySourceIndex,
+          handSpannedMultipleTubes: this.handSpannedMultipleTubes,
+          moves: this.moves,
+        };
+      }
+
+      /** 各バーは空か単色。同色は高々1本のバーにしか置けない。手元に残っていると未クリア。 */
+      isWin() {
+        if (!this.hand.isEmpty()) return false;
+        const seenColors = new Set();
+        for (const tube of this.tubes) {
+          const arr = tube.toArrayBottomToTop();
+          if (arr.length === 0) continue;
+          const c = arr[0];
+          if (!arr.every((x) => x === c)) return false;
+          if (seenColors.has(c)) return false;
+          seenColors.add(c);
+        }
+        return true;
+      }
+
+      /** 手元バッファへ tube から上端同色を積む（両スタックの上端が同色である必要＝「上同士でつながる」） */
+      tryPopFromTubeOntoHand(tubeIndex) {
+        const tube = this.tubes[tubeIndex];
+        if (tube.isEmpty()) return false;
+        if (this.hand.peekTop() !== tube.peekTop()) return false;
+        const take = Math.min(tube.topColorRunLength(), this.hand.room);
+        if (take <= 0) return false;
+        const chunk = tube.popTopColorRunAtMost(take);
+        this.hand.pushBottomToTop(chunk);
+        this.handSpannedMultipleTubes = true;
+        this.moves++;
+        return true;
+      }
+
+      /** 手元の一塊を tube へ PUSH */
+      tryPushHandOntoTube(tubeIndex) {
+        const dest = this.tubes[tubeIndex];
+        const chunk = this.hand.toArrayBottomToTop();
+        if (!dest.canAcceptBottomToTopChunk(chunk)) return false;
+        dest.pushBottomToTop(chunk);
+        this.hand.clear();
+        this.primarySourceIndex = null;
+        this.handSpannedMultipleTubes = false;
+        this.moves++;
+        return true;
+      }
+
+      /** 空の手元に tube から上端同色連続を POP */
+      pickFromTubeToEmptyHand(tubeIndex) {
+        if (!this.hand.isEmpty()) return;
+        const tube = this.tubes[tubeIndex];
+        if (tube.isEmpty()) return;
+        const chunk = tube.popTopColorRun();
+        this.hand.pushBottomToTop(chunk);
+        this.primarySourceIndex = tubeIndex;
+        this.handSpannedMultipleTubes = false;
+      }
+
+      /** 単一出所の手元を、そのバーへ戻す（PUSH の逆） */
+      returnHandToPrimaryTube() {
+        if (this.primarySourceIndex == null) return;
+        const tube = this.tubes[this.primarySourceIndex];
+        const chunk = this.hand.toArrayBottomToTop();
+        tube.pushBottomToTop(chunk);
+        this.hand.clear();
+        this.primarySourceIndex = null;
+        this.handSpannedMultipleTubes = false;
+      }
+
+      flashInvalid() {
+        const el = els.hand;
+        if (!el) return;
+        el.classList.remove('hand-invalid-shake');
+        void el.offsetWidth;
+        el.classList.add('hand-invalid-shake');
+      }
+
+      /**
+       * タップ1回の解決順（仕様をここに集約）:
+       * 1. 手元が空 → そのバーから上端同色連続を POP して手元へ
+       * 2. 手元あり・同じバー・未合流 → 手元をそのバーへ戻す（キャンセル）
+       * 3. 手元あり・別バー → 上端が同色なら先にバー→手元へ Pull（追加 POP）
+       * 4. それ以外で余白があれば手元→バーへ PUSH
+       * 5. まだだめで単一出所なら戻してから、タップしたバーから取る
+       * 6. それ以外は無効
+       */
+      tapTube(index) {
+        if (this.hand.isEmpty()) {
+          this.pickFromTubeToEmptyHand(index);
+          return;
+        }
+
+        if (index === this.primarySourceIndex && !this.handSpannedMultipleTubes) {
+          this.returnHandToPrimaryTube();
+          return;
+        }
+
+        if (this.tryPopFromTubeOntoHand(index)) return;
+
+        if (this.tryPushHandOntoTube(index)) return;
+
+        if (this.primarySourceIndex != null && !this.handSpannedMultipleTubes) {
+          this.returnHandToPrimaryTube();
+          const pickedAgain = !this.tubes[index].isEmpty();
+          if (pickedAgain) this.pickFromTubeToEmptyHand(index);
+          return;
+        }
+
+        this.flashInvalid();
+      }
+    }
+
+    /** @type {MagicJewelGame | null} */
+    let game = null;
+    /** @type {'title'|'playing'|'won'|'gameover'} */
+    let gamePhase = 'title';
+    /** @type {'short'|'middle'|'long'|null} */
+    let currentDifficulty = null;
+    let timerIntervalId = null;
+    let secondsLeft = 0;
+    let secondsInitial = 0;
+
+    function stopTimer() {
+      if (timerIntervalId != null) {
+        clearInterval(timerIntervalId);
+        timerIntervalId = null;
+      }
+    }
+
+    function formatTime(sec) {
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return `${m}:${String(s).padStart(2, '0')}`;
+    }
+
+    function updateTimerDisplay() {
+      if (!els.timerDisplay) return;
+      els.timerDisplay.textContent = formatTime(Math.max(0, secondsLeft));
+      const pct = secondsInitial > 0 ? (100 * Math.max(0, secondsLeft)) / secondsInitial : 0;
+      els.timerBar.style.width = `${pct}%`;
+      els.timerDisplay.classList.toggle('text-rose-400', secondsLeft > 0 && secondsLeft <= 30);
+      els.timerDisplay.classList.toggle('timer-urgent', secondsLeft > 0 && secondsLeft <= 15);
+      els.timerWrap.classList.toggle('ring-rose-500/50', secondsLeft > 0 && secondsLeft <= 30);
+    }
+
+    function triggerGameOver() {
+      if (gamePhase !== 'playing') return;
+      stopTimer();
+      gamePhase = 'gameover';
+      glog('gameover', { reason: 'time', difficulty: currentDifficulty });
+      const label =
+        currentDifficulty === 'short'
+          ? 'かんたん'
+          : currentDifficulty === 'middle'
+            ? 'ふつう'
+            : currentDifficulty === 'long'
+              ? 'ながい'
+              : '';
+      els.gameoverDetail.textContent = `${label}モードで時間切れ。リトライで同じ条件から、タイトルへで難易度を選び直せます。`;
+      showGameOverOverlay();
+    }
+
+    function tickTimer() {
+      if (gamePhase !== 'playing') return;
+      secondsLeft -= 1;
+      updateTimerDisplay();
+      if (secondsLeft <= 0) triggerGameOver();
+    }
+
+    function startTimerForLevel() {
+      stopTimer();
+      secondsInitial = LEVEL_TIME_SEC[currentDifficulty] ?? 240;
+      secondsLeft = secondsInitial;
+      updateTimerDisplay();
+      timerIntervalId = window.setInterval(tickTimer, 1000);
+    }
+
+    function showTitleScreen() {
+      stopTimer();
+      gamePhase = 'title';
+      game = null;
+      currentDifficulty = null;
+      els.screenTitle.classList.remove('hidden');
+      els.screenGame.classList.add('hidden');
+      hideWin();
+      hideGameOverOverlay();
+      els.timerDisplay.textContent = '—:—';
+      els.timerBar.style.width = '100%';
+    }
+
+    function showGameScreen() {
+      els.screenTitle.classList.add('hidden');
+      els.screenGame.classList.remove('hidden');
+    }
+
+    function startGame(difficultyKey) {
+      stopTimer();
+      hideWin();
+      hideGameOverOverlay();
+      currentDifficulty = difficultyKey;
+      const initial = LEVEL_INITIAL[difficultyKey];
+      if (!initial) return;
+      const cap = LEVEL_TUBE_CAPACITY[difficultyKey] ?? 4;
+      game = new MagicJewelGame(initial, cap, `start:${difficultyKey}`);
+      gamePhase = 'playing';
+      const names = {
+        short: 'かんたん（4色・各4）',
+        middle: 'ふつう（5色・各8）',
+        long: 'ながい（6色・各12）',
+      };
+      els.difficultyLabel.textContent = names[difficultyKey] ?? difficultyKey;
+      showGameScreen();
+      startTimerForLevel();
+      render();
+    }
+
+    function onTubeClick(index) {
+      if (gamePhase !== 'playing' || !game) return;
+      game.tapTube(index);
+      render();
+      if (game.isWin()) {
+        stopTimer();
+        gamePhase = 'won';
+        glog('win', { difficulty: currentDifficulty });
+        showWin();
+      }
+    }
+
+    function renderHand() {
+      if (!game) return;
+      els.handStack.replaceChildren();
+      const arr = game.hand.toArrayBottomToTop();
+      if (arr.length === 0) {
+        els.handHint.textContent = '空の手元：バーをタップ → 上端の同色連続が POP して手元へ';
+        return;
+      }
+      if (game.handSpannedMultipleTubes) {
+        els.handHint.textContent =
+          '手元にスタックあり（複数バーから POP）。空きバーへ PUSH するかフッターの「タイトルに戻る」';
+      } else {
+        els.handHint.textContent =
+          '別バーへタップ：上端が同色なら先に Pull、違えば余白があれば PUSH。取ったバーでキャンセル';
+      }
+      [...arr].reverse().forEach((id) => els.handStack.appendChild(jewelDot(id, { small: true })));
+    }
+
+    function renderTubes() {
+      if (!game) return;
+      els.tubes.replaceChildren();
+      game.tubes.forEach((tube, index) => {
+        const stack = tube.toArrayBottomToTop();
+        const cap = tube.capacity;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className =
+          'group relative flex w-[14vw] max-w-[4.5rem] min-w-[3rem] flex-col items-stretch rounded-t-lg rounded-b-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400 sm:max-w-[5.5rem] sm:min-w-[3.75rem]';
+        btn.setAttribute('aria-label', `バー ${index + 1}`);
+
+        const rim = document.createElement('div');
+        rim.className =
+          'z-10 h-2 shrink-0 rounded-t-md bg-gradient-to-b from-white/35 to-white/10 ring-1 ring-white/30';
+        btn.appendChild(rim);
+
+        const glass = document.createElement('div');
+        const capAll = game.tubeCapacity;
+        const glassSize =
+          capAll <= 4
+            ? 'min-h-[38vw] max-h-[22rem] sm:min-h-[200px]'
+            : capAll <= 8
+              ? 'min-h-[46vw] max-h-[28rem] sm:min-h-[260px]'
+              : 'min-h-[52vw] max-h-[34rem] sm:min-h-[320px]';
+        glass.className =
+          'tube-glass relative flex flex-1 flex-col-reverse items-center gap-0.5 rounded-b-2xl px-1 pb-1 pt-2 sm:gap-1 ' +
+          glassSize;
+        const emptySlots = cap - stack.length;
+        const phCls =
+          cap > 8
+            ? 'h-5 w-[78%] max-w-[2.25rem] rounded-full border border-dashed border-white/10 sm:h-6 sm:max-w-[2.5rem]'
+            : 'h-7 w-[85%] max-w-[2.75rem] rounded-full border border-dashed border-white/10 sm:h-9 sm:max-w-[2.85rem]';
+        for (let i = 0; i < emptySlots; i++) {
+          const ph = document.createElement('div');
+          ph.className = phCls;
+          ph.setAttribute('aria-hidden', 'true');
+          glass.appendChild(ph);
+        }
+        const smallJewel = cap > 6;
+        stack.forEach((id) => glass.appendChild(jewelDot(id, { small: smallJewel })));
+        btn.appendChild(glass);
+
+        const base = document.createElement('div');
+        base.className =
+          'h-3 w-[108%] -translate-x-[4%] rounded-full bg-slate-800/90 ring-1 ring-white/10 shadow-lg';
+        btn.appendChild(base);
+
+        btn.addEventListener('click', () => onTubeClick(index));
+        els.tubes.appendChild(btn);
+      });
+    }
+
+    function render() {
+      if (!game) return;
+      renderHand();
+      renderTubes();
+      els.moves.textContent = game.moves ? `手数: ${game.moves}` : '';
+    }
+
+    function showWin() {
+      glog('showWinOverlay', {});
+      els.witchGallery.replaceChildren();
+      const witchIndex = 1 + Math.floor(Math.random() * 5);
+      const figure = document.createElement('figure');
+      figure.className =
+        'animate-float-soft mx-auto w-52 max-w-[85vw] overflow-hidden rounded-xl border border-white/20 bg-slate-900/60 shadow-lg sm:w-60';
+      const img = document.createElement('img');
+      img.src = `img/${witchIndex}.webp`;
+      img.alt = `魔女 ${witchIndex}`;
+      img.width = 400;
+      img.height = 500;
+      img.loading = 'lazy';
+      img.className = 'aspect-[4/5] w-full object-cover object-top';
+      img.onerror = () => {
+        img.replaceWith(
+          Object.assign(document.createElement('div'), {
+            className:
+              'flex aspect-[4/5] w-full items-center justify-center bg-gradient-to-b from-violet-900/50 to-slate-900 text-xs text-slate-500',
+            textContent: `${witchIndex}.webp`,
+          }),
+        );
+      };
+      figure.appendChild(img);
+      els.witchGallery.appendChild(figure);
+      const ov = els.overlayWin;
+      ov.removeAttribute('inert');
+      ov.classList.remove('pointer-events-none', 'opacity-0');
+      ov.classList.add('pointer-events-auto', 'opacity-100');
+      ov.setAttribute('aria-hidden', 'false');
+      els.btnPlayAgain.disabled = false;
+    }
+
+    function hideWin() {
+      const ov = els.overlayWin;
+      const wasOpen = ov.getAttribute('aria-hidden') === 'false';
+      ov.setAttribute('inert', '');
+      ov.classList.add('pointer-events-none', 'opacity-0');
+      ov.classList.remove('pointer-events-auto', 'opacity-100');
+      ov.setAttribute('aria-hidden', 'true');
+      els.btnPlayAgain.disabled = true;
+      if (wasOpen) glog('hideWinOverlay', {});
+    }
+
+    function showGameOverOverlay() {
+      const ov = els.overlayLose;
+      ov.removeAttribute('inert');
+      ov.classList.remove('pointer-events-none', 'opacity-0');
+      ov.classList.add('pointer-events-auto', 'opacity-100');
+      ov.setAttribute('aria-hidden', 'false');
+      els.btnToTitle.disabled = false;
+      els.btnRetryTimeup.disabled = false;
+    }
+
+    function hideGameOverOverlay() {
+      const ov = els.overlayLose;
+      ov.setAttribute('inert', '');
+      ov.classList.add('pointer-events-none', 'opacity-0');
+      ov.classList.remove('pointer-events-auto', 'opacity-100');
+      ov.setAttribute('aria-hidden', 'true');
+      els.btnToTitle.disabled = true;
+      els.btnRetryTimeup.disabled = true;
+    }
+
+    els.btnReset.addEventListener('click', () => {
+      if (gamePhase === 'playing' || gamePhase === 'won') showTitleScreen();
+    });
+
+    els.btnPlayAgain.addEventListener('click', () => {
+      hideWin();
+      showTitleScreen();
+    });
+
+    els.btnToTitle.addEventListener('click', () => {
+      hideGameOverOverlay();
+      showTitleScreen();
+    });
+
+    els.btnRetryTimeup.addEventListener('click', () => {
+      if (!currentDifficulty) return;
+      hideGameOverOverlay();
+      startGame(currentDifficulty);
+    });
+
+    document.querySelectorAll('[data-difficulty]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const d = btn.getAttribute('data-difficulty');
+        if (d === 'short' || d === 'middle' || d === 'long') startGame(d);
+      });
+    });
+
+    if (els.titleArt) {
+      els.titleArt.addEventListener('error', () => {
+        els.titleArt.alt = 'タイトル画像';
+        els.titleArt.src =
+          'data:image/svg+xml,' +
+          encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="700" viewBox="0 0 400 700"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#1e1b4b"/><stop offset="1" stop-color="#312e81"/></linearGradient></defs><rect fill="url(#g)" width="400" height="700"/><text x="200" y="340" fill="#c4b5fd" font-family="serif" font-size="22" text-anchor="middle">img/title.webp</text></svg>',
+          );
+      });
+    }
+
+    if (els.gameOverArt) {
+      els.gameOverArt.addEventListener('error', () => {
+        els.gameOverArt.alt = 'ゲームオーバー';
+        els.gameOverArt.src =
+          'data:image/svg+xml,' +
+          encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360"><defs><linearGradient id="go" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#450a0a"/><stop offset="1" stop-color="#1c1917"/></linearGradient></defs><rect fill="url(#go)" width="640" height="360"/><text x="320" y="190" fill="#fecaca" font-family="serif" font-size="26" text-anchor="middle">img/gameOver.webp</text></svg>',
+          );
+      });
+    }
+
+    showTitleScreen();
+  </script>
+</body>
+</html>
